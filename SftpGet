@@ -1,0 +1,106 @@
+package com.sterlint.util.feed.transfer;
+
+import static tim.util.Misc.stack2String;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.List;
+import java.util.Vector;
+
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.Session;
+
+@SuppressWarnings("unchecked")
+public class SftpGet implements FileTransfer {
+
+	private final JschSessionFactory sessionFactory;
+	private String copiedFileName;
+	
+	public SftpGet(JschSessionFactory sessionFactory){
+		this.sessionFactory = sessionFactory;
+	}
+
+	@Override
+	public List<String> grep (String dir, String regex) {
+		return SftpUtils.grep(dir, regex, sessionFactory);
+	}
+
+	public boolean exists(String path){
+		return SftpUtils.exists(sessionFactory.openSftpChannel(), path);
+	}
+	
+	
+	@Override
+	public boolean transfer(String fromDir, String toDir, String fileTemplate) throws IOException {
+		
+		ChannelSftp channel = sessionFactory.openSftpChannel();
+		
+		try {
+			
+			String fileName = FeedFileUtils.findFile(fromDir, fileTemplate, this);
+			
+			if(fileName==null)
+				throw new FileNotFoundException("couldn't find any matching file for: "  + fileTemplate + " in " + fromDir);
+			
+			String from = fromDir + "/" + fileName;
+			// look for target dir and create if necessary
+			if(!SftpUtils.exists(channel, from))
+				throw new FileNotFoundException("directory not found: " + from);
+			
+			
+			// if we have a wildcard in the name we can't use it
+			// as the destination name so we have to use the actual 
+			// name of the file we are copying
+			Vector<ChannelSftp.LsEntry> files = channel.ls(from);	
+			if(files.size()!=1){
+				StringBuffer sb = new StringBuffer();
+				for(ChannelSftp.LsEntry file : files){
+					sb.append(file.getFilename()).append("\n");
+				}
+				throw new FileNotFoundException("Filename:" + from + " was either not found or not unique. These filenames matched: \n" + sb.toString());
+			}
+			
+			// get the file
+			copiedFileName = files.get(0).getFilename();
+			channel.cd(fromDir);
+			channel.lcd(toDir);
+			channel.get(copiedFileName, copiedFileName);
+			
+			files.get(0).getAttrs().getSize();
+			
+			File lclFile = new File(toDir + "/" + copiedFileName);
+			copiedFileName = FeedFileUtils.ungZip(lclFile).getName();
+			
+			return true;
+		} catch (FileNotFoundException fnfe){
+			
+			throw fnfe;
+		
+		} catch (Exception e){
+			
+			throw new IOException("[SftpFileCopier] " + stack2String(e));
+		
+		} finally {
+			
+			closeChannel(channel);
+			
+		}
+
+	}
+	
+	void closeChannel(ChannelSftp channel) throws IOException {
+		try {
+			Session session = channel.getSession();
+			channel.exit();
+			session.disconnect();
+		} catch (Exception jsche){
+			throw new IOException(jsche);
+		}
+	}
+
+	public String getDestinationFilename(){
+		return copiedFileName;
+	}
+
+}
