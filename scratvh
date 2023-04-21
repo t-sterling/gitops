@@ -1,0 +1,80 @@
+package tim.test;
+
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.apis.BatchApi;
+import io.kubernetes.client.openapi.apis.BatchV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobBuilder;
+import io.kubernetes.client.openapi.models.V1NodeList;
+
+import io.kubernetes.client.util.Config;
+
+
+import java.util.Collections;
+
+public class Main {
+
+    static V1Job createJob() {
+        return new V1JobBuilder()
+                .withNewMetadata()
+                .withName("my-job")
+                .withLabels(Collections.singletonMap("app", "my-app"))
+                .endMetadata()
+                .withNewSpec()
+                .withNewTemplate()
+                .withNewSpec()
+                .addNewContainer()
+                .withName("my-job")
+                .withImage("timsterling/hello-cronjob:latest")
+                // .withCommand("my-command")
+                .withArgs("my-args")
+                .endContainer()
+                .withRestartPolicy("Never")
+                .endSpec()
+                .endTemplate()
+                .withBackoffLimit(0)
+                .endSpec()
+                .build();
+
+    }
+
+
+    // create a new pod/job everytime
+    // pod post a job running/job complete message
+    // read from kafka job-scheduling
+    public static void main(String[] args) throws Exception {
+
+        var client = Config.defaultClient();
+
+        var api = new CoreV1Api(client);
+
+        var batchAPI = new BatchV1Api(client);
+
+        var job = createJob();
+
+        batchAPI.createNamespacedJob("default", job, null, null, null);
+
+        while(true) {
+
+            V1Job jobStatus = batchAPI.readNamespacedJobStatus("my-job", "default", "false");
+            System.out.println("Job status: " + jobStatus.getStatus().toString());
+
+            Thread.sleep(1_000);
+
+        }
+
+    }
+
+    /*
+
+        V1NodeList nodeList = api.listNode(null, null, null, null, null, null, null, null, 10, false);
+        nodeList.getItems()
+                .stream()
+                .forEach((node) -> System.out.println(node));
+
+        System.out.println("Hello world!");
+     */
+
+
+}
