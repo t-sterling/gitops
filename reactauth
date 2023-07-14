@@ -61,3 +61,32 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
+--------------
+
+
+import React, { useEffect } from 'react';
+import { useHistory } from 'react-router-dom';
+
+const withAuth = (WrappedComponent) => {
+  const ComponentWithAuth = () => {
+    const history = useHistory();
+
+    useEffect(() => {
+      // Check if the user is authenticated
+      const isAuthenticated = checkAuthentication(); // Implement your authentication logic here
+
+      if (!isAuthenticated) {
+        // Redirect to the login page if not authenticated
+        history.push('/login');
+      }
+    }, []);
+
+    return <WrappedComponent />;
+  };
+
+  return ComponentWithAuth;
+};
+
+export default withAuth;
