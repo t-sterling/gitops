@@ -1,0 +1,63 @@
+import React from 'react';
+import { Redirect, Route, RouteProps } from 'react-router-dom';
+
+interface ProtectedRouteProps extends RouteProps {
+  isAuthenticated: boolean;
+  redirectPath: string;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  isAuthenticated,
+  redirectPath,
+  component: Component,
+  ...rest
+}) => {
+  return (
+    <Route
+      {...rest}
+      render={(props) =>
+        isAuthenticated ? (
+          <Component {...props} />
+        ) : (
+          <Redirect to={redirectPath} />
+        )
+      }
+    />
+  );
+};
+
+export default ProtectedRoute;
+
+
+import React from 'react';
+import { BrowserRouter as Router, Switch } from 'react-router-dom';
+import ProtectedRoute from './ProtectedRoute';
+import Home from './Home';
+import Dashboard from './Dashboard';
+import Login from './Login';
+
+const App: React.FC = () => {
+  const isAuthenticated = // Logic to determine if the user is authenticated
+
+  return (
+    <Router>
+      <Switch>
+        <Route exact path="/login" component={Login} />
+        <ProtectedRoute
+          path="/dashboard"
+          component={Dashboard}
+          isAuthenticated={isAuthenticated}
+          redirectPath="/login"
+        />
+        <ProtectedRoute
+          path="/"
+          component={Home}
+          isAuthenticated={isAuthenticated}
+          redirectPath="/login"
+        />
+      </Switch>
+    </Router>
+  );
+};
+
+export default App;
